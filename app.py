@@ -5,8 +5,8 @@ from streamlit_folium import st_folium
 import urllib.parse
 
 # Configuración Inicial
-st.set_page_config(page_title="Noris | Reportes Funes", page_icon="🌳")
-st.title("🌳 Noris: Reporte Ciudadano Funes")
+st.set_page_config(page_title="Reportes Funes", page_icon="📢")
+st.title("📢 Reporte Ciudadano Funes")
 st.markdown("Reportá baches, luminarias rotas o restos de poda. La IA redactará el reclamo formal.")
 
 # Intenta buscar la clave en Secrets, si no la encuentra, deja que se pueda poner a mano
@@ -50,8 +50,9 @@ if api_key:
         
         col1, col2 = st.columns(2)
         # Número de ejemplo (reemplazar por el de la Muni o Defensa Civil)
-        col1.link_button("Enviar por WhatsApp 🟢", f"https://wa.me/5493410000000?text={msg}")
+        col1.link_button("Enviar por WhatsApp 🟢", f"https://wa.me/549341248414?text={msg}")
         col2.link_button("Enviar por Email ✉️", f"mailto:atencionciudadana@funes.gob.ar?subject=Reclamo&body={msg}")
 else:
 
     st.warning("Falta la API Key en la barra lateral.")
+
