@@ -3,99 +3,83 @@ from openai import OpenAI
 import folium
 from streamlit_folium import st_folium
 from geopy.geocoders import Nominatim
+from streamlit_js_eval import get_geolocation
 import urllib.parse
 
-# Configuración de página y Estilo
-st.set_page_config(page_title="Reclamo Funes", page_icon="📢", layout="centered")
+# Configuración
+st.set_page_config(page_title="Reclamo Funes", page_icon="🌳")
+geolocator = Nominatim(user_agent="noris_funes_final")
 
-# Inicializar Geocodificador (para obtener la dirección)
-geolocator = Nominatim(user_agent="noris_funes_app")
+st.title("🌳 Reclamo Funes")
+st.markdown("Reportá problemas en la vía pública de forma rápida.")
 
-# Título Principal
-st.title("📢 Reclamo Funes")
+# --- SECCIÓN GPS AUTOMÁTICO ---
+st.subheader("1. Tu Ubicación")
+col_gps, col_txt = st.columns([1, 2])
 
-# --- SISTEMA DE PASOS (STEPPER) ---
-paso = st.radio("Progreso del reporte:", ["1. Ubicación", "2. Detalle y Foto", "3. Generar y Enviar"], horizontal=True)
+with col_gps:
+    if st.button("📍 Usar mi ubicación actual"):
+        loc = get_geolocation()
+        if loc:
+            st.session_state.lat_gps = loc['coords']['latitude']
+            st.session_state.lon_gps = loc['coords']['longitude']
+            st.success("¡Ubicación capturada!")
 
-# Inicializar variables en la sesión para que no se borren al cambiar de paso
-if 'direccion' not in st.session_state: st.session_state.direccion = ""
-if 'coords' not in st.session_state: st.session_state.coords = ""
+# --- MAPA ---
+# Coordenadas por defecto (Funes) o las del GPS si existen
+default_lat = st.session_state.get('lat_gps', -32.9168)
+default_lon = st.session_state.get('lon_gps', -60.8115)
 
-# --- PASO 1: UBICACIÓN ---
-if paso == "1. Ubicación":
-    st.subheader("📍 Paso 1: Tocá el mapa donde está el problema")
-    
-    FUNES_LAT, FUNES_LNG = -32.9168, -60.8115
-    m = folium.Map(location=[FUNES_LAT, FUNES_LNG], zoom_start=14)
-    m.add_child(folium.LatLngPopup())
-    
-    map_data = st_folium(m, height=400, width=700)
-    
-    if map_data['last_clicked']:
-        lat = map_data['last_clicked']['lat']
-        lng = map_data['last_clicked']['lng']
-        st.session_state.coords = f"{lat}, {lng}"
-        
-        # OBTENER DIRECCIÓN AUTOMÁTICA
-        try:
-            location = geolocator.reverse(f"{lat}, {lng}")
-            st.session_state.direccion = location.address.split(",")[0] + ", Funes"
-            st.success(f"✅ Ubicación detectada: {st.session_state.direccion}")
-        except:
-            st.session_state.direccion = "Dirección en Funes"
+m = folium.Map(location=[default_lat, default_lon], zoom_start=16)
+folium.Marker([default_lat, default_lon], tooltip="Tu ubicación").add_to(m)
+m.add_child(folium.LatLngPopup())
 
-    st.info("Una vez marcada la ubicación, pasá al punto '2. Detalle y Foto' arriba.")
+map_data = st_folium(m, height=350, width=700)
 
-# --- PASO 2: DETALLE Y FOTO ---
-elif paso == "2. Detalle y Foto":
-    st.subheader("📝 Paso 2: Contanos qué pasó")
-    
-    if not st.session_state.direccion:
-        st.warning("⚠️ Primero marcá el lugar en el mapa (Paso 1).")
-    
-    tipo_problema = st.selectbox("Categoría:", ["🕳️ Bache / Calle", "💡 Luminaria rota", "🌿 Poda / Residuos", "🚨 Seguridad / Otro"])
-    detalle = st.text_area("Descripción breve:", placeholder="Ej: La lámpara parpadea hace dos días...")
-    
-    # SUBIDA DE FOTO
-    foto = st.file_uploader("📸 Subí una foto del problema (opcional)", type=['jpg', 'png', 'jpeg'])
-    if foto:
-        st.image(foto, caption="Vista previa de la evidencia", width=300)
+# Lógica de Dirección
+lat_click = None
+lon_click = None
 
-    st.session_state.datos_reporte = {"tipo": tipo_problema, "detalle": detalle, "tiene_foto": "SÍ" if foto else "NO"}
+if map_data['last_clicked']:
+    lat_click = map_data['last_clicked']['lat']
+    lon_click = map_data['last_clicked']['lng']
+elif 'lat_gps' in st.session_state:
+    lat_click = st.session_state.lat_gps
+    lon_click = st.session_state.lon_gps
 
-# --- PASO 3: GENERAR Y ENVIAR ---
-elif paso == "3. Enviar":
-    st.subheader("✨ Paso 3: Revisar y Enviar")
-    
-    if 'datos_reporte' not in st.session_state or not st.session_state.direccion:
-        st.error("Faltan datos de los pasos anteriores.")
+direccion_final = "No seleccionada"
+if lat_click and lon_click:
+    try:
+        location = geolocator.reverse(f"{lat_click}, {lon_click}", language="es", addressdetails=True)
+        raw = location.raw['address']
+        calle = raw.get('road', 'Calle desconocida')
+        altura = raw.get('house_number', '')
+        direccion_final = f"{calle} {altura}, Funes".strip(", ")
+        st.info(f"📍 Dirección: {direccion_final}")
+    except:
+        direccion_final = "Ubicación en Funes"
+
+# --- FORMULARIO TODO EN UNO ---
+st.subheader("2. Detalle del Problema")
+tipo = st.selectbox("¿Qué sucede?", ["🕳️ Bache", "💡 Luminaria", "🌿 Poda/Residuos", "🚨 Seguridad"])
+detalle = st.text_area("Más información:", placeholder="Contanos un poco más...")
+foto = st.file_uploader("📸 Foto (opcional)", type=['jpg', 'jpeg', 'png'])
+
+# --- GENERACIÓN ---
+if st.button("🚀 Generar y Enviar Reclamo"):
+    if direccion_final == "No seleccionada":
+        st.error("Por favor, marcá el lugar en el mapa o usá el GPS.")
     else:
-        # Recuperar API KEY de Secrets
         api_key = st.secrets.get("OPENAI_API_KEY")
+        client = OpenAI(api_key=api_key)
         
-        if api_key and st.button("🚀 Generar Reclamo con IA"):
-            client = OpenAI(api_key=api_key)
+        prompt = f"Escribí un reclamo municipal formal para Funes. Tipo: {tipo}. Detalle: {detalle}. Ubicación: {direccion_final}. Coordenadas: {lat_click}, {lon_click}. Firmar como Noris IA."
+        
+        with st.spinner("Redactando..."):
+            res = client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
+            carta = res.choices[0].message.content
+            st.text_area("Resultado:", carta, height=200)
             
-            prompt = f"""
-            Escribí un reclamo formal para la Municipalidad de Funes.
-            Tipo: {st.session_state.datos_reporte['tipo']}
-            Detalle: {st.session_state.datos_reporte['detalle']}
-            Ubicación exacta: {st.session_state.direccion} (Coordenadas: {st.session_state.coords})
-            Adjunta foto: {st.session_state.datos_reporte['tiene_foto']}
-            Firmar como: Vecino de Funes mediante la plataforma Noris IA.
-            """
-            
-            with st.spinner("La IA está redactando..."):
-                res = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                st.session_state.carta = res.choices[0].message.content
-
-        if 'carta' in st.session_state:
-            st.text_area("Texto listo para enviar:", st.session_state.carta, height=250)
-            
-            msg_codificado = urllib.parse.quote(st.session_state.carta)
-            numero_muni = "5493412248414"
-            
-            st.link_button("🟢 Enviar reporte por WhatsApp", f"https://wa.me/{numero_muni}?text={msg_codificado}")
+            # Botón WhatsApp
+            msg_wa = urllib.parse.quote(carta)
+            st.link_button("🟢 Enviar a la Municipalidad", f"https://wa.me/5493412248414?text={msg_wa}")
