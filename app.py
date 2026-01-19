@@ -50,9 +50,12 @@ if api_key:
         
         col1, col2 = st.columns(2)
         # Número de ejemplo (reemplazar por el de la Muni o Defensa Civil)
-        col1.link_button("Enviar por WhatsApp 🟢", f"https://wa.me/549341248414?text={msg}")
+        # El número debe ser solo números, sin el +
+        numero_muni = "5493412248414" 
+        col1.link_button("Enviar por WhatsApp 🟢", f"https://wa.me/{numero_muni}?text={msg}")
         col2.link_button("Enviar por Email ✉️", f"mailto:atencionciudadana@funes.gob.ar?subject=Reclamo&body={msg}")
 else:
 
     st.warning("Falta la API Key en la barra lateral.")
+
 
