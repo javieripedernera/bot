@@ -9,8 +9,11 @@ st.set_page_config(page_title="Noris | Reportes Funes", page_icon="🌳")
 st.title("🌳 Noris: Reporte Ciudadano Funes")
 st.markdown("Reportá baches, luminarias rotas o restos de poda. La IA redactará el reclamo formal.")
 
-# API Key (Cargala en 'Secrets' de Streamlit más tarde)
-api_key = st.sidebar.text_input("OpenAI API Key", type="password")
+# Intenta buscar la clave en Secrets, si no la encuentra, deja que se pueda poner a mano
+if "OPENAI_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENAI_API_KEY"]
+else:
+    api_key = st.sidebar.text_input("OpenAI API Key", type="password")
 
 if api_key:
     client = OpenAI(api_key=api_key)
@@ -50,4 +53,5 @@ if api_key:
         col1.link_button("Enviar por WhatsApp 🟢", f"https://wa.me/5493410000000?text={msg}")
         col2.link_button("Enviar por Email ✉️", f"mailto:atencionciudadana@funes.gob.ar?subject=Reclamo&body={msg}")
 else:
+
     st.warning("Falta la API Key en la barra lateral.")
